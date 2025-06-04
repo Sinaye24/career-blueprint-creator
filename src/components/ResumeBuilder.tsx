@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar';
 import { FormSection, FormField, ArrayField } from './FormSection';
@@ -9,15 +8,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Resume, ResumeSection, Experience, Education, Skill } from '@/types/resume';
 import { saveResumeData, loadResumeData, getDefaultResume } from '@/utils/resumeStorage';
+import { exportToPDF, exportToHTML, exportToDOCX } from '@/utils/exportUtils';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Save } from 'lucide-react';
+import { Download, Save, ChevronDown, FileText, Globe, FileImage } from 'lucide-react';
 
 export const ResumeBuilder: React.FC = () => {
   const [currentSection, setCurrentSection] = useState<ResumeSection>('personal');
   const [resume, setResume] = useState<Resume>(getDefaultResume());
   const [completedSections, setCompletedSections] = useState<Set<ResumeSection>>(new Set());
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
   // Load saved data on mount
@@ -119,6 +121,47 @@ export const ResumeBuilder: React.FC = () => {
       i === index ? { ...skill, [field]: value } : skill
     );
     updateResume('skills', updated);
+  };
+
+  const handleExport = async (format: 'pdf' | 'html' | 'docx') => {
+    setIsExporting(true);
+    try {
+      const filename = resume.personalInfo.fullName 
+        ? resume.personalInfo.fullName.toLowerCase().replace(/\s+/g, '-') 
+        : 'resume';
+
+      switch (format) {
+        case 'pdf':
+          await exportToPDF('resume-preview', filename);
+          toast({
+            title: "PDF exported successfully",
+            description: "Your resume has been downloaded as a PDF file.",
+          });
+          break;
+        case 'html':
+          exportToHTML(resume, filename);
+          toast({
+            title: "HTML exported successfully",
+            description: "Your resume has been downloaded as an HTML file.",
+          });
+          break;
+        case 'docx':
+          await exportToDOCX(resume, filename);
+          toast({
+            title: "DOCX exported successfully",
+            description: "Your resume has been downloaded as a Word document.",
+          });
+          break;
+      }
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your resume. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const renderPersonalInfoSection = () => (
@@ -412,18 +455,33 @@ export const ResumeBuilder: React.FC = () => {
               <Save className="w-4 h-4" />
               Save
             </Button>
-            <Button
-              onClick={() => {
-                toast({
-                  title: "Export feature coming soon",
-                  description: "PDF export will be available in the next update.",
-                });
-              }}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-            >
-              <Download className="w-4 h-4" />
-              Export PDF
-            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  disabled={isExporting}
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                >
+                  <Download className="w-4 h-4" />
+                  {isExporting ? 'Exporting...' : 'Export'}
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport('pdf')} className="flex items-center gap-2">
+                  <FileImage className="w-4 h-4" />
+                  Export as PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('html')} className="flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Export as HTML
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('docx')} className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Export as DOCX
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -434,7 +492,9 @@ export const ResumeBuilder: React.FC = () => {
       </div>
 
       <div className="bg-gray-50 p-8 rounded-lg">
-        <ResumePreview resume={resume} />
+        <div id="resume-preview">
+          <ResumePreview resume={resume} />
+        </div>
       </div>
 
       <div className="flex justify-center pt-8">
